@@ -1,0 +1,53 @@
+GtkProgressBar {
+            -GtkProgressBar-min-horizontal-bar-height: 24px; /* stupid css name TODO:change to something more good. */
+            color: red;
+            background: rgba(0,255,0,1);
+            /*barcolor:rgba(255,255,255,1);*/
+ }
+
+GtkProgressBar.progressbar{
+    background: rgba(255,0,0,1);
+}
+
+.colorize {
+
+           background: rgba(0,0,0,1);
+           color: red;
+   }
+
+.uncolorize{
+           background: rgba(0,255,0,1);
+           color: white;
+}
+
+.makeitblue{
+           background: rgba(0,0,255,1);
+}
+.makeitgreen{
+           background: rgba(0,255,0,1);
+           color: black;
+           font-weight: bold;
+}
+.makeitwhite{
+           background: white;
+}
+.makeitgrass{
+           background: #1c9b15; /* #8f9a8f;*/
+}
+.linelabel{
+           background: rgba(0,64,0,1);
+           color: white;
+           font-weight: bold;
+           font-size: 150%;
+}
+.colorizeR {
+           background: rgba(0,0,0,1);
+           color: red;
+           font-size: 150%;
+   }
+
+.uncolorizeR{
+           background: rgba(0,255,0,1);
+           color: black;
+           font-size: 150%;
+}

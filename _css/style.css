@@ -1,0 +1,35 @@
+GtkProgressBar {
+            -GtkProgressBar-min-horizontal-bar-height: 24px; /* stupid css name TODO:change to something more useful. */
+            color: red;
+            background: rgba(0,255,0,1);
+    }
+
+GtkProgressBar.progressbar{
+    background: rgba(255,0,0,1);
+    }
+
+.bluebg{
+           background: rgba(0,0,255,1);
+    }
+
+.colorize {
+
+           background: rgba(255,0,0,1);
+           color: white;
+    }
+
+.uncolorize {
+           background: rgba(0,255,0,1);
+           color: black;
+    }
+
+.makeitgrass{
+           background: #1c9b15;
+    }
+
+.linelabel{
+           background: rgba(0,64,0,1);
+           color: white;
+           font-weight: bold;
+           font-size: 150%;
+    }
