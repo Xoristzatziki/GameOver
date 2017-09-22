@@ -19,24 +19,24 @@
 
 import os, sys, random
 
-class Games:
+class Puzzles:
     def __init__( self, datadir):
-        with open(os.path.join(datadir, 'gamedata'), mode='rt', encoding='utf-8') as f:
+        with open(os.path.join(datadir, 'puzzledata'), mode='rt', encoding='utf-8') as f:
             alllines = f.readlines()
-        self.allgames = {}
+        self.allpuzzles = {}
         xcounter = 0
         for line in alllines:
             if len(line.strip()):
                 splittedline = line.split(',')
-                self.allgames[xcounter] = {'name': splittedline[0][1:-1],
+                self.allpuzzles[xcounter] = {'name': splittedline[0][1:-1],
                         'size': int(splittedline[1]),
                         'nums for rows': tuple([int(x) for x in splittedline[2:]])}
                 xcounter += 1
 
-    def get_a_game(self):
+    def get_a_puzzle(self):
         random.seed()
-        selectednum = random.randrange(len(self.allgames))
-        return self.allgames[selectednum]
+        selectednum = random.randrange(len(self.allpuzzles))
+        return self.allpuzzles[selectednum]
 
 class Hints:
     def __init__( self, datadir):

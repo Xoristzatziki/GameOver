@@ -21,67 +21,83 @@ import os, sys
 import subprocess
 import datetime
 
+import pyaudio
+import wave
+
 import threading
 import random
 
 import gi
 gi.require_version('Gtk', '3.0')
+gi.require_version('Gst', '1.0')
 
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GdkPixbuf
 from gi.repository import GLib
 from gi.repository import GObject
+from gi.repository import Gst
 
+#Gst.init(None)
 
 from _lib.OCP import *
 
+from _lib.media import Player as localplayer
+
+
+#from contextlib import contextmanager
+
 ABANDONED = 'Abandoned!'
+
+CHUNK = 1024
 
 class ReturnParameter:
     def __init__( self):
         self.result = ABANDONED
         self.inverted = False
-        self.gamecells = {}
+        self.puzzlecells = {}
         self.remainingtime = 0
-        self.thegame = None
+        self.thepuzzle = None
 
-class Game(Gtk.Window):
-    def __init__( self, myApp, parent, agame, mymedia, cellsize, hint):
-        Gtk.Window.__init__(self, name = 'A Game', title = 'Game Over - Playground')
+class Puzzle(Gtk.Window):
+    def __init__( self, myApp, parent, apuzzle, mymedia, cellsize, hint):
+        Gtk.Window.__init__(self, name = 'A Field', title = 'Game Over - Playground')
         self.App = myApp
         self.set_modal(True)
         self.set_transient_for(parent)
-        self.gameruns = False
+        self.puzzleruns = False
         self.InstanceName = 'OCP' + self.App.appname + self.App.version + '-' + str(datetime.datetime.now()) + '-AGAME'
 
         self.Appdir = myApp.workingdir
 
         self.mymedia = mymedia
+        #self.myplayer = theplayer
+        #self.myplayer = localplayer()
         self.cellsize = cellsize
         self.mybuilder = Gtk.Builder()
+
 
         mainbox = 'onegamewindowgrid'
         self.connect("hide", self.hideme)
 
         self.load_styles()
 
-        self.gamedata = agame
-        self.timetocomplete = int(self.gamedata['timetocomplete'] * 1000)
+        self.puzzledata = apuzzle
+        self.timetocomplete = int(self.puzzledata['timetocomplete'] * 1000)
         self.remainingtime = self.timetocomplete
 
-        self.boardsize = int(self.gamedata['size'])
+        self.boardsize = int(self.puzzledata['size'])
         self.remainingempty = 0
         self.rowstrings = []
         self.colstrings = []
-        self.gamecells = {}
+        self.puzzlecells = {}
         self.rowdata = {}
         self.returnparameter = ReturnParameter()
-        self.returnparameter.thegame = agame
+        self.returnparameter.thepuzzle = apuzzle
         for xcounter in range(self.boardsize):
-            self.rowdata[xcounter] = int(self.gamedata['nums for rows'][xcounter])
+            self.rowdata[xcounter] = int(self.puzzledata['nums for rows'][xcounter])
 
-        gladename = os.path.abspath( os.path.join(myApp.workingdir, '_glades', 'game.glade'))
+        gladename = os.path.abspath( os.path.join(myApp.workingdir, '_glades', 'playfield.glade'))
         self.mybuilder = Gtk.Builder()
         _tmplist = []#[x for x in otherwidjets]
         _tmplist.append( mainbox )
@@ -124,8 +140,8 @@ class Game(Gtk.Window):
         thecellforcolstrings = self.mybuilder.get_object('eventboxforcolstrings')
         thecellforcolstrings.get_style_context().add_class('makeitgrass')
 
-        gamegrid = self.mybuilder.get_object('gridforgame')
-        gamegrid.get_style_context().add_class('bluebg')
+        puzzlegrid = self.mybuilder.get_object('gridforpuzzle')
+        puzzlegrid.get_style_context().add_class('bluebg')
         rowstringsgrid = self.mybuilder.get_object('gridforrowstrings')
         colstringsgrid = self.mybuilder.get_object('gridforcolstrings')
 
@@ -156,7 +172,7 @@ class Game(Gtk.Window):
                 cellnumber = rowcounter + (colcounter * self.boardsize)
                 cellvalue = rowbins[rowcounter][colcounter]
                 if cellvalue:
-                    self.gamecells[cellnumber] = {'hasbomb' : False}
+                    self.puzzlecells[cellnumber] = {'hasbomb' : False}
                     self.remainingempty += 1
                     if rowpreviousvalue == 1:
                         rowcountingones += 1
@@ -167,11 +183,11 @@ class Game(Gtk.Window):
                             rowstring += '-'
                         rowcountingones = 1
                 else:
-                    self.gamecells[cellnumber] = {'hasbomb' : True}
+                    self.puzzlecells[cellnumber] = {'hasbomb' : True}
                 rowpreviousvalue = cellvalue
             #grid
                 eventbox = Gtk.EventBox()
-                gamegrid.attach(eventbox,colcounter,rowcounter,1,1)
+                puzzlegrid.attach(eventbox,colcounter,rowcounter,1,1)
 
                 eventbox.set_name('E' + str(cellnumber))
                 eventbox.set_size_request(self.cellsize, self.cellsize)
@@ -195,10 +211,10 @@ class Game(Gtk.Window):
                 img.set_vexpand(True)
                 #self.other_set_bg(img)
                 #img.get_style_context().add_class('uncolorize')
-                #print('0' if self.gamecells[cellnumber]['hasbomb'] else '1',end = ',')
+                #print('0' if self.puzzlecells[cellnumber]['hasbomb'] else '1',end = ',')
 
-                self.gamecells[cellnumber]={'eventbox':eventbox, 'imgwidget': img,
-                    'imgname': 'black', 'hasbomb': self.gamecells[cellnumber]['hasbomb'],
+                self.puzzlecells[cellnumber]={'eventbox':eventbox, 'imgwidget': img,
+                    'imgname': 'black', 'hasbomb': self.puzzlecells[cellnumber]['hasbomb'],
                     'lucky' : 0}
             #print()
             if rowcountingones > 0:
@@ -207,7 +223,7 @@ class Game(Gtk.Window):
             if rowstring == '': rowstring = '0'
             #print(rowcounter, rowstring)
             self.rowstrings.append(rowstring)
-            self.returnparameter.gamecells = self.gamecells
+            self.returnparameter.puzzlecells = self.puzzlecells
         #print('for rows')
         for colcounter in range(self.boardsize):
             colones = 0
@@ -235,7 +251,7 @@ class Game(Gtk.Window):
             colstring = colstring.strip('\n')
             if colstring == '': colstring = '0'
             self.colstrings.append(colstring)
-        gamegrid.set_visible(True)
+        puzzlegrid.set_visible(True)
         for xcounter in range(self.boardsize):
 
             label = Gtk.Label(self.rowstrings[xcounter])
@@ -257,8 +273,8 @@ class Game(Gtk.Window):
             label.set_vexpand(True)
             label.get_style_context().add_class('linelabel')
 
-    def start_game(self):
-        self.gameruns = True
+    def start_puzzle(self):
+        self.puzzleruns = True
         GLib.timeout_add(1000, self.update_timer)
 
 ########################################################################
@@ -267,7 +283,7 @@ class Game(Gtk.Window):
 #
 ########################################################################
     def on_any_cell_button_released(self, widget, *args):
-        if not self.gameruns:
+        if not self.puzzleruns:
             return
         buttonreleased = args[0].button
         ebname = widget.get_name()
@@ -276,19 +292,19 @@ class Game(Gtk.Window):
         _bombed = False
 
         if buttonreleased == 1:#left button pressed to open it
-            if self.gamecells[cellnumber]['imgname'] == 'flag':
+            if self.puzzlecells[cellnumber]['imgname'] == 'flag':
                 return
-            if self.gamecells[cellnumber]['hasbomb']:
+            if self.puzzlecells[cellnumber]['hasbomb']:
                 self.bomb_found(widget, cellnumber)
-            elif self.gamecells[cellnumber]['lucky']:
+            elif self.puzzlecells[cellnumber]['lucky']:
                 pass#TODO: give gift
-            elif self.gamecells[cellnumber]['imgname'] == 'white':
+            elif self.puzzlecells[cellnumber]['imgname'] == 'white':
                 return
             else:
                 self.open_cell(widget, cellnumber)
         elif buttonreleased == 3:
             #self.rightbuttonpressed(widget,row,col)
-            if self.gamecells[cellnumber]['lucky']:
+            if self.puzzlecells[cellnumber]['lucky']:
                 self.give_gift(widget, cellnumber)
             self.flag_cell(widget, cellnumber)
 
@@ -302,17 +318,17 @@ class Game(Gtk.Window):
 ########################################################################
     def open_cell(self, widget, cellnumber):
         timeremaining = self.remainingtime
-        if self.gamecells[cellnumber]['lucky']:
+        if self.puzzlecells[cellnumber]['lucky']:
             self.give_gift(widget, cellnumber)
         self.ring('opened')
-        self.gamecells[cellnumber]['imgname'] = 'white'
+        self.puzzlecells[cellnumber]['imgname'] = 'white'
         self.set_new_image(cellnumber)
         self.remainingempty -= 1
         if self.remainingempty <= 0:
             self.returnparameter.remainingtime = self.remainingtime
             self.returnparameter.result = 'Solved!'
-            self.stop_game()
-            self.ring('solved')
+            self.stop_puzzle()
+            #self.ring('solved')
             return
 
         self.remainingtime += 500
@@ -320,13 +336,13 @@ class Game(Gtk.Window):
 
     def bomb_found(self, widget, cellnumber):
         #print(cellnumber, 'bomb')
-        if self.gamecells[cellnumber]['lucky']:
+        if self.puzzlecells[cellnumber]['lucky']:
             self.give_gift(widget, cellnumber)
         else:
             self.returnparameter.result = 'Bomb found.'
-            self.stop_game()
-            self.ring('bomb')
-            #self.gamecells[cellnumber]['imgname'] = 'exploded'
+            self.stop_puzzle()
+            #self.ring('bomb')
+            #self.puzzlecells[cellnumber]['imgname'] = 'exploded'
             #self.set_new_image(cellnumber)
 
     def give_gift(self, widget, cellnumber):
@@ -334,23 +350,23 @@ class Game(Gtk.Window):
         #TODO:give some gift...
 
     def flag_cell(self, widget, cellnumber):
-        if self.gamecells[cellnumber]['imgname'] == 'flag':
-            self.gamecells[cellnumber]['imgname'] = 'black'
+        if self.puzzlecells[cellnumber]['imgname'] == 'flag':
+            self.puzzlecells[cellnumber]['imgname'] = 'black'
         else:
-            self.gamecells[cellnumber]['imgname'] = 'flag'
+            self.puzzlecells[cellnumber]['imgname'] = 'flag'
         self.set_new_image(cellnumber)
 
-    def stop_game(self):
-        self.gameruns = False
+    def stop_puzzle(self):
+        self.puzzleruns = False
 
     def time_over(self):
-        self.gameruns = False
+        self.puzzleruns = False
         self.returnparameter.result = 'Time over!'
         self.hideme()
 
     def update_timer(self):
         #progressbarfortime
-        if not self.gameruns:
+        if not self.puzzleruns:
             #myprint('==========says game not running in  update timer')
             return False
         if self.remainingtime > self.timetocomplete:
@@ -360,7 +376,7 @@ class Game(Gtk.Window):
             #myprint('says time over')
             self.time_over()
             return False
-        #self.ring('timebell')
+        self.ring('timebell')
         #myprint('did bell ringed?')
         self.update_progressbar()
         return True
@@ -381,8 +397,9 @@ class Game(Gtk.Window):
         threading.Thread(target=self.ring_in_thread, args=(soundfor,)).start()
 
     def ring_in_thread(self, soundfor):
-        _thesoundfile = self.mymedia.soundfiles[soundfor]
-        subprocess.run(["ffplay", '-v', 'quiet', "-nodisp",'-hide_banner', "-autoexit", _thesoundfile], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _thesoundfile = self.mymedia.sounduris[soundfor]
+        localplayer().play_the_sound(_thesoundfile)
+        #print(threading.active_count())
 
 ########################################################################
 #
@@ -390,7 +407,7 @@ class Game(Gtk.Window):
 #
 ########################################################################
     def set_new_image(self, cellnumber):
-        self.gamecells[cellnumber]['imgwidget'].set_from_pixbuf(self.mymedia.images[self.gamecells[cellnumber]['imgname']])
+        self.puzzlecells[cellnumber]['imgwidget'].set_from_pixbuf(self.mymedia.images[self.puzzlecells[cellnumber]['imgname']])
 
 ########################################################################
 #
@@ -402,11 +419,11 @@ class Game(Gtk.Window):
         self.show_all()
         self.mybuilder.get_object('buttonusehelp').set_sensitive(False)
         self.set_resizable(False)
-        self.start_game()
+        self.start_puzzle()
         #loop eternaly
         while True:
             #if we want to exit
-            if not self.gameruns:
+            if not self.puzzleruns:
                 #print('wecanexitnow')
                 #break the loop
                 break
@@ -422,7 +439,51 @@ class Game(Gtk.Window):
         return self.returnparameter
 
     def hideme(self, *args):
-        self.gameruns = False
-        if self.returnparameter.result == ABANDONED:
-            self.ring('timeout')
+        self.puzzleruns = False
+        #if self.returnparameter.result == ABANDONED:
+            #self.ring('timeout')
         self.wecanexitnow = True
+
+def play_simple_sound(theuri):
+    player = Gst.parse_launch ("playbin uri=" + theuri)
+    player.set_state(Gst.State.PLAYING)
+
+
+#@contextmanager
+#def silence_stdout():
+    #new_target = open(os.devnull, "w")
+    #old_target, sys.stdout = sys.stdout, new_target
+    #try:
+        #yield new_target
+    #finally:
+        #sys.stdout = old_target
+
+def play_with_pyaudio(thefile):
+    new_target = open(os.devnull, "w")
+    old_target, sys.stdout = sys.stdout, new_target
+    old_err_target, sys.stderr = sys.stderr, new_target
+    try:
+        wf = wave.open(thefile, 'rb')
+        # instantiate PyAudio (1)
+        p = pyaudio.PyAudio()
+        # open stream (2)
+        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
+                    channels=wf.getnchannels(),
+                    rate=wf.getframerate(),
+                    output=True)
+        # read data
+        data = wf.readframes(CHUNK)
+        # play stream (3)
+        while len(data) > 0:
+            stream.write(data)
+            data = wf.readframes(CHUNK)
+
+        # stop stream (4)
+        stream.stop_stream()
+        stream.close()
+
+        # close PyAudio (5)
+        p.terminate()
+    finally:
+        sys.stdout = old_target
+        sys.stderr = old_err_target

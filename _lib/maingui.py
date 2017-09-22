@@ -38,9 +38,9 @@ from gi.repository import GObject
 
 
 from _lib.OCP import *
-from _lib import game #board of running game
+from _lib import playfield #board of running game
 from _lib import media #Loader of icons and sounds
-from _lib import creategames #GUI for creating new puzzles
+from _lib import createpuzzles #GUI for creating new puzzles
 from _lib import strings #Loader of puzzles and hint strings
 
 CELLSIZE = 32
@@ -54,7 +54,7 @@ class GameScore():
         self.score = 0
         self.lifes = 3
         self.difficulty = 0
-        self.gamesplayed = {}
+        self.puzzlesplayed = {}
         self.helps = 0
         self.lastresult = ''
 
@@ -65,25 +65,30 @@ class MainGui(AbstractGui):
         self.Appdir = myApp.workingdir
 
         self.mymedia = media.MyMedia(myApp, CELLSIZE)
+        #self.myplayer = media.Player()
 
         self.connect("key-press-event", self.somekeypressed)
+        self.connect("realize", self.on_window_realize)
         self.datadir = os.path.abspath( os.path.join(myApp.workingdir, '_data'))
 
-        self.games = strings.Games(self.datadir)
+        self.puzzles = strings.Puzzles(self.datadir)
         self.hints = strings.Hints(self.datadir)
 
         self.initialising = True
-        self.hasgame = False
+        self.haspuzzle = False
         self.gameruns = False
         self.clearonexit = False
         self.resizing = False
-        self.gamegrid =  None
-        self.gameicongrid = self.mybuilder.get_object('gridforsolution')
+        self.puzzleicongrid = self.mybuilder.get_object('gridforsolution')
         self.newgame = None
-        self.givinggift = None
-
+        self.videoplayer = None
         self.scoredata = GameScore()
-        #self.show_score()
+
+        self.showvideos = (self.MySettings.readconfigvalue('Video','showvideos','True').strip()  == 'True')
+        #print('loaded novideo', self.showvideos)
+        #self.mybuilder.get_object('checkvideotoggle').set_active(self.novideo)
+        self.mybuilder.get_object('imageGO').set_from_file(self.mymedia.icons['logo'])
+
 
         _W = int(self.MySettings.readconfigvalue('windowMain','width',str(self.get_screen().get_width()-100)))
         _H = int(self.MySettings.readconfigvalue('windowMain','height', str(self.get_screen().get_height()-100)) )
@@ -109,6 +114,7 @@ class MainGui(AbstractGui):
         self.mybuilder.get_object('labelforresult').get_style_context().add_class('uncolorizeR')
 
         self.mybuilder.get_object('gridforsolution').get_style_context().add_class('makeitblue')
+        self.mybuilder.get_object('videoprojector').get_style_context().add_class('backstyle')
 
         self.initialising = False
 
@@ -117,25 +123,6 @@ class MainGui(AbstractGui):
 #              INITIALIZING
 #
 ########################################################################
-    def load_games(self):
-        with open(os.path.join(self.App.workingdir, '_data', 'gamedata'), mode='rt', encoding='utf-8') as f:
-            alllines = f.readlines()
-        self.allgames = {}
-        xcounter = 0
-        for line in alllines:
-            if len(line.strip()):
-                splittedline = line.split(',')
-                #agame = {}
-                #agame['name'] = splittedline[0]
-                #agame['size'] = int(splittedline[1])
-                #agame['nums for rows'] = tuple([int(x) for x in splittedline[2:])
-                #agame['timetocomplete'] = 20
-                 #= (17, 10, 4, 10, 17)
-                self.allgames[xcounter] = {'name': splittedline[0],
-                        'size': int(splittedline[1]),
-                        'nums for rows': tuple([int(x) for x in splittedline[2:]])}
-                xcounter += 1
-
     def load_styles(self):
         style_provider = Gtk.CssProvider()
         stylecssfile = os.path.abspath( os.path.join(self.Appdir, '_css', 'style.css'))
@@ -159,7 +146,7 @@ class MainGui(AbstractGui):
             return
         try:
             W, H = self.get_size()
-            print(self.is_maximized())
+            #print(self.is_maximized())
             if self.mybuilder.get_object('radiobuttonclearall').get_active():
                 self.MySettings.writeconfigvalue('Option', 'lastsetting', '2')
                 self.MySettings.deleteconfigvalue('windowMain','Width')
@@ -170,9 +157,11 @@ class MainGui(AbstractGui):
                 self.MySettings.writeconfigvalue('windowMain','Width',str(W))#.encode('utf-8')
                 self.MySettings.writeconfigvalue('windowMain','Height',str(H))#.encode('utf-8')
                 self.MySettings.writeconfigvalue('windowMain','maximized',str(self.is_maximized()))#.encode('utf-8')
+                self.MySettings.writeconfigvalue('Video','showvideos',str(self.showvideos))
+                #print('saved showvideos', self.showvideos)
 
         except Exception as e:
-            print('e2',e)
+            print('e in savemysetings:',e)
 
     def clearing(self):
         pass
@@ -183,20 +172,28 @@ class MainGui(AbstractGui):
 #              START NEW GAME
 #
 ########################################################################
-    def on_buttonstartgame_clicked(self, *args):
-        self.start_a_game()
+    def on_buttonnextpuzzle_clicked(self, *args):
+        self.start_next_puzzle()
 
-    def start_a_game(self):
-        self.hide_last_game()
-        agame = self.games.get_a_game()
+    def reset_game(self):
+        #NotYet(self)
+        self.scoredata = GameScore()
+        self.show_score()
+        self.hide_last_puzzle()
+        self.mybuilder.get_object('buttonnextpuzzle').set_sensitive(True)
+
+    def start_next_puzzle(self):
+        self.hide_last_puzzle()
+        apuzzle = self.puzzles.get_a_puzzle()
         ahint = self.hints.get_a_hint()
-        agame['timetocomplete'] = 30
-        self.onegame = game.Game(self.App, self, agame, self.mymedia, CELLSIZE, ahint)
-        _result = self.onegame.run()
-        self.onegame.destroy()
+        apuzzle['timetocomplete'] = 30
+        _thepuzzle = playfield.Puzzle(self.App, self, apuzzle, self.mymedia, CELLSIZE, ahint)
+        _result = _thepuzzle.run()
+        _thepuzzle.destroy()
         self.set_score(_result)
-        self.mybuilder.get_object('buttonstartgame').set_sensitive(self.scoredata.lifes > 0)
-
+        self.mybuilder.get_object('buttonnextpuzzle').set_sensitive(self.scoredata.lifes > 0)
+        self.gameruns = self.mybuilder.get_object('buttonnextpuzzle').get_sensitive()
+        #print('self.gameruns', self.gameruns)
 
 ########################################################################
 #
@@ -205,48 +202,52 @@ class MainGui(AbstractGui):
 ########################################################################
     def show_solution(self, result):
         #print('showing solution ===================================')
-        gamecells = result.gamecells
+        puzzlecells = result.puzzlecells
         inverted = result.inverted
-        boardonesize = result.thegame['size']
-        labelgamename = self.mybuilder.get_object('labelgamename')
-        labelgamename.set_label('You managed to find: ' + result.thegame['name'])
-        labelgamename.set_visible(True)
+        boardonesize = result.thepuzzle['size']
+        _label = self.mybuilder.get_object('labelpuzzlename')
+        _label.set_label('You managed to find: ' + result.thepuzzle['name'])
+        _label.set_visible(True)
 
         eb = self.mybuilder.get_object('eventboxforsolution')
 
-        self.gameicongrid = Gtk.Grid()
-        eb.add(self.gameicongrid)
+        self.puzzleicongrid = Gtk.Grid()
+        eb.add(self.puzzleicongrid)
 
         for rowcounter in range(boardonesize):
             for colcounter in range(boardonesize):
                 cellnumber = colcounter + (rowcounter * boardonesize)
-                if gamecells[cellnumber]['hasbomb'] ^ inverted:
+                if puzzlecells[cellnumber]['hasbomb'] ^ inverted:
                     img = Gtk.Image.new_from_file(self.blackimagefilename)
                 else:
                     img = Gtk.Image.new_from_file(self.whiteimagefilename)
-                self.gameicongrid.attach(img, rowcounter, colcounter, 1, 1)
+                self.puzzleicongrid.attach(img, rowcounter, colcounter, 1, 1)
                 img.set_visible(True)
                 img.set_halign(Gtk.Align.START)
                 img.set_valign(Gtk.Align.START)
                 img.set_hexpand(True)
                 img.set_vexpand(True)
-        self.gameicongrid.set_halign(Gtk.Align.START)
-        self.gameicongrid.set_valign(Gtk.Align.START)
-        self.gameicongrid.set_hexpand(True)
-        self.gameicongrid.set_vexpand(True)
+        self.puzzleicongrid.set_halign(Gtk.Align.START)
+        self.puzzleicongrid.set_valign(Gtk.Align.START)
+        self.puzzleicongrid.set_hexpand(True)
+        self.puzzleicongrid.set_vexpand(True)
 
-        self.gameicongrid.set_visible(True)
+        self.puzzleicongrid.set_visible(True)
         eb.set_visible(True)
 
     def set_score(self, result):
-        self.scoredata.gamesplayed[len(self.scoredata.gamesplayed) + 1 ] = result.thegame
+        self.scoredata.puzzlesplayed[len(self.scoredata.puzzlesplayed) + 1 ] = result.thepuzzle
         self.scoredata.lastresult = result.result
         if result.result == 'Solved!':
+            self.ring('solved')
+            self.play('solved')
             self.show_solution(result)
             self.scoredata.score += result.remainingtime // 10
         else:
+            self.ring('bomb')
+            self.play('bomb')
             self.scoredata.lifes -= 1
-            self.mybuilder.get_object('labelgamename').set_label('Bad Robot!')
+            self.mybuilder.get_object('labelpuzzlename').set_label('Bad Robot!')
             self.scoredata.score -= 500
             if self.scoredata.score < 0:
                 self.scoredata.score = 0
@@ -255,7 +256,7 @@ class MainGui(AbstractGui):
     def show_score(self):
         self.mybuilder.get_object('labellifes').set_label(str(self.scoredata.lifes))
         self.mybuilder.get_object('labelscore').set_label(locale.format_string('%0d', self.scoredata.score, grouping = True))
-        self.mybuilder.get_object('labelgamesplayed').set_label(str(len(self.scoredata.gamesplayed)))
+        self.mybuilder.get_object('labelpuzzlesplayed').set_label(str(len(self.scoredata.puzzlesplayed)))
         widget = self.mybuilder.get_object('labelforresult')
 
         if self.scoredata.lastresult == 'Solved!':
@@ -270,10 +271,12 @@ class MainGui(AbstractGui):
                 widget.get_style_context().add_class('colorizeR')
         widget.set_label(self.scoredata.lastresult)
 
-    def hide_last_game(self):
-        self.mybuilder.get_object('labelgamename').set_label('a new game')
-        if self.gameicongrid:
-            self.gameicongrid.destroy()
+    def hide_last_puzzle(self):
+        self.mybuilder.get_object('labelpuzzlename').set_label('a new puzzle')
+        if self.videoplayer:
+            self.videoplayer.stopb()
+        if self.puzzleicongrid:
+            self.puzzleicongrid.destroy()
 
 ########################################################################
 #
@@ -303,7 +306,12 @@ class MainGui(AbstractGui):
                     return self.set_new_position(txt == 'F5')
 
     def on_grid1_size_allocate(self, *args):
-        pass
+        #widget = self.mybuilder.get_object('backforvideo')
+        #widget2 = self.mybuilder.get_object('videoprojector')
+        widget = self.mybuilder.get_object('videoprojector')
+        W = widget.get_allocated_width()
+        #widget.set_height_request(int(W * (3/4)))
+        widget.set_size_request(-1, int(W * (3/4)))
 
 ########################################################################
 #
@@ -322,12 +330,12 @@ class MainGui(AbstractGui):
             thenewsize = 5
         if thenewsize > 20:
             thenewsize = 20
-        creategameswindow = creategames.CreateGame(self.App, 'creategames.glade', gladenongraphicstuple, mainbox='grid1',
+        createpuzzlesswindow = createpuzzles.CreatePuzzle(self.App, 'creategames.glade', gladenongraphicstuple, mainbox='grid1',
                 thesize = thenewsize, cellsize = CELLSIZE, mymedia = self.mymedia, parent = self)
-        creategameswindow.set_position(Gtk.WindowPosition.CENTER)
-        response = creategameswindow.run()
-        print('response',response)
-        creategameswindow.destroy()
+        createpuzzlesswindow.set_position(Gtk.WindowPosition.CENTER)
+        response = createpuzzlesswindow.run()
+        #print('response',response)
+        createpuzzlesswindow.destroy()
 
 
 ########################################################################
@@ -336,14 +344,63 @@ class MainGui(AbstractGui):
 #
 ########################################################################
     def on_buttontest2_clicked(self, *args):
-        pass
+        Msg(self, 'something')
 
     def on_buttontest1_clicked(self, *args):
+        self.mybuilder.get_object('buttonnextpuzzle').set_sensitive(True)
+
+    def on_checkvideotoggle_toggled(self, *args):
+        self.set_if_video()
+
+    def on_buttonstartnewgame_clicked(self, *args):
+        if self.gameruns:
+            result = AreYouSure(self, 'There is a game running.\nReally abandon it?')
+            if not result:
+                return
+        self.reset_game()
+
+    def on_grid1_realize(self, *args):
+        #self.set_if_video()
+        #print('grid realized')
         pass
 
+    def on_window_realize(self, *args):
+        #update from cinf file, after window starts
+        #(because we have a show all in AbstractGui)
+        self.mybuilder.get_object('checkvideotoggle').set_active(self.showvideos)
+
+        self.set_if_video()
+        #print('window realized')
 
 ########################################################################
 #
 #              GENERAL
 #
 ########################################################################
+    def set_if_video(self):
+        self.showvideos = self.mybuilder.get_object('checkvideotoggle').get_active()
+        #print('now showvideos = ', self.showvideos)
+        self.mybuilder.get_object('videoprojector').set_visible(self.showvideos)
+        self.mybuilder.get_object('imageGO').set_visible(not self.showvideos)
+        if (self.videoplayer and (not self.showvideos)):
+            self.videoplayer.stopb()
+
+    def update_videoslider(self):
+        print('check if something is done else not used.')
+
+    def ring(self, soundfor):
+        threading.Thread(target=self.ring_in_thread, args=(soundfor,)).start()
+
+    def ring_in_thread(self, soundfor):
+        _thesoundfile = self.mymedia.sounduris[soundfor]
+        media.Player().play_the_sound(_thesoundfile)
+        #print(threading.active_count())
+
+    def play(self, videofor):
+        if self.showvideos:
+            self.mybuilder.get_object('videoprojector').set_visible(True)
+            uri = self.mymedia.videouris[videofor]
+            widget = self.mybuilder.get_object('videoprojector')
+            self.videoplayer = media.VideoPlayer(widget, uri, self.update_videoslider)
+            self.videoplayer.startb()
+

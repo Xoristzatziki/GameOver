@@ -33,3 +33,10 @@ GtkProgressBar.progressbar{
            font-weight: bold;
            font-size: 150%;
     }
+
+.backstyle2{
+    background: #228b22;
+}
+.backstyle{
+    background: rgba(34,139,34,1);
+}

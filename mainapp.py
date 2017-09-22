@@ -41,7 +41,7 @@ import _lib.maingui as myMainGui
 
 APPNAME = 'Game Over'
 #TODO:set version before production
-version = ''
+version = '0.0.28'
 
 class App:
     def __init__( self, realfile_dir):

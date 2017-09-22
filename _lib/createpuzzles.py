@@ -33,7 +33,7 @@ from gi.repository import GObject
 
 from _lib.OCP import *
 
-class CreateGame(AbstractGui):
+class CreatePuzzle(AbstractGui):
     def __init__( self, myApp, gladefilename, otherwidjets = (),parent = None, mainbox=None, thesize = 5, cellsize = 32, mymedia = None):
         AbstractGui.__init__(self, myApp, gladefilename, parent = parent, otherwidjets=otherwidjets, mainbox=mainbox, savemysettings=self.savemysetings, clearing=self.clearing)
         self.App = myApp
@@ -50,7 +50,7 @@ class CreateGame(AbstractGui):
 
         self.rowstrings = {}
         self.colstrings = {}
-        self.gamegrid = None
+        self.puzzlegrid = None
         self.icongrid = None
 
 
@@ -69,13 +69,13 @@ class CreateGame(AbstractGui):
         pass
 
     def initialize_grids(self):
-        if self.gamegrid:
-            self.gamegrid.destroy()
+        if self.puzzlegrid:
+            self.puzzlegrid.destroy()
             self.icongrid.destroy()
         for xcounter in range(self.boardsize):
             self.rowstrings[xcounter] = { 'label': '0', 'widget': None}
             self.colstrings[xcounter] = { 'label': '0', 'widget': None}
-        self.gamecells = {}
+        self.puzzlecells = {}
         self.create_empty_grids()
 
 
@@ -85,18 +85,18 @@ class CreateGame(AbstractGui):
         icongrid = Gtk.Grid()
         thewindowgrid.attach(icongrid, 0, 2, 1, 1)
         self.icongrid = icongrid
-        gamegrid = Gtk.Grid()
-        thewindowgrid.attach_next_to(gamegrid,self.icongrid, Gtk.PositionType.RIGHT, 1, 1)
-        self.gamegrid = gamegrid
-        #print(self.icongrid, self.gamegrid)
-        gamegrid.get_style_context().add_class('makeitgreen')
+        puzzlegrid = Gtk.Grid()
+        thewindowgrid.attach_next_to(puzzlegrid,self.icongrid, Gtk.PositionType.RIGHT, 1, 1)
+        self.puzzlegrid = puzzlegrid
+        #print(self.icongrid, self.puzzlegrid)
+        puzzlegrid.get_style_context().add_class('makeitgreen')
 
-        gamegrid.set_column_spacing(2)
-        gamegrid.set_row_spacing(2)
-        gamegrid.set_halign(Gtk.Align.START)
-        gamegrid.set_valign(Gtk.Align.START)
-        gamegrid.set_hexpand(True)
-        gamegrid.set_vexpand(True)
+        puzzlegrid.set_column_spacing(2)
+        puzzlegrid.set_row_spacing(2)
+        puzzlegrid.set_halign(Gtk.Align.START)
+        puzzlegrid.set_valign(Gtk.Align.START)
+        puzzlegrid.set_hexpand(True)
+        puzzlegrid.set_vexpand(True)
 
         icongrid.set_halign(Gtk.Align.START)
         icongrid.set_valign(Gtk.Align.START)
@@ -108,7 +108,7 @@ class CreateGame(AbstractGui):
                 cellnumber = colcounter + (rowcounter * self.boardsize)
 
                 eventbox = Gtk.EventBox()
-                gamegrid.attach(eventbox, rowcounter, colcounter, 1, 1)
+                puzzlegrid.attach(eventbox, rowcounter, colcounter, 1, 1)
 
                 eventbox.set_name('E' + str(cellnumber))
                 eventbox.set_size_request(self.cellsize, self.cellsize)
@@ -141,12 +141,12 @@ class CreateGame(AbstractGui):
                 iconimg.set_vexpand(True)
                 self.other_set_bg(iconimg)
 
-                self.gamecells[cellnumber]={'eventbox':eventbox, 'imgwidget': img,
+                self.puzzlecells[cellnumber]={'eventbox':eventbox, 'imgwidget': img,
                     'imgname': 'black', 'hasbomb': True, 'iconwidget': iconimg,
                     'lucky' : 0}
 
             label = Gtk.Label(self.rowstrings[rowcounter]['label'])
-            gamegrid.attach(label, colcounter+1, rowcounter,1,1)
+            puzzlegrid.attach(label, colcounter+1, rowcounter,1,1)
             self.rowstrings[rowcounter]['widget'] = label
 
             label.set_visible(True)
@@ -157,7 +157,7 @@ class CreateGame(AbstractGui):
             label.get_style_context().add_class('makeitgreen')
 
             label = Gtk.Label(self.colstrings[rowcounter]['label'])
-            gamegrid.attach(label, rowcounter, colcounter+1,1,1)
+            puzzlegrid.attach(label, rowcounter, colcounter+1,1,1)
             self.colstrings[rowcounter]['widget'] = label
 
             label.set_visible(True)
@@ -167,22 +167,22 @@ class CreateGame(AbstractGui):
             label.set_vexpand(True)
             label.get_style_context().add_class('makeitgreen')
 
-            gamegrid.set_visible(True)
+            puzzlegrid.set_visible(True)
             icongrid.set_visible(True)
-            gamegrid.get_style_context().add_class('makeitwhite')
+            puzzlegrid.get_style_context().add_class('makeitwhite')
 
     def on_any_cell_button_released(self, widget, *args):
         buttonreleased = args[0].button
         ebname = widget.get_name()
         cellnumber = int(ebname[1:])
-        if self.gamecells[cellnumber]['hasbomb']:
-            self.gamecells[cellnumber]['imgwidget'].set_from_pixbuf(self.whiteimg.get_pixbuf())
-            self.gamecells[cellnumber]['iconwidget'].set_from_pixbuf(self.whiteicon.get_pixbuf())
-            self.gamecells[cellnumber]['hasbomb'] = False
+        if self.puzzlecells[cellnumber]['hasbomb']:
+            self.puzzlecells[cellnumber]['imgwidget'].set_from_pixbuf(self.whiteimg.get_pixbuf())
+            self.puzzlecells[cellnumber]['iconwidget'].set_from_pixbuf(self.whiteicon.get_pixbuf())
+            self.puzzlecells[cellnumber]['hasbomb'] = False
         else:
-            self.gamecells[cellnumber]['imgwidget'].set_from_pixbuf(self.blackimg.get_pixbuf())
-            self.gamecells[cellnumber]['iconwidget'].set_from_pixbuf(self.blackicon.get_pixbuf())
-            self.gamecells[cellnumber]['hasbomb'] = True
+            self.puzzlecells[cellnumber]['imgwidget'].set_from_pixbuf(self.blackimg.get_pixbuf())
+            self.puzzlecells[cellnumber]['iconwidget'].set_from_pixbuf(self.blackicon.get_pixbuf())
+            self.puzzlecells[cellnumber]['hasbomb'] = True
         self.update_hints()
 
     def on_buttontest1_clicked(self, *args):
@@ -196,7 +196,7 @@ class CreateGame(AbstractGui):
             rowstring = ''
             for colcounter in range(self.boardsize):
                 cellnumber = rowcounter + (colcounter * self.boardsize)
-                cellvalue = not self.gamecells[cellnumber]['hasbomb']
+                cellvalue = not self.puzzlecells[cellnumber]['hasbomb']
                 if cellvalue:
                     if rowpreviousvalue == 1:
                         rowcountingones += 1
@@ -220,7 +220,7 @@ class CreateGame(AbstractGui):
             colstring = ''
             for rowcounter in range(self.boardsize):
                 cellnumber = rowcounter + (colcounter * self.boardsize)
-                cellvalue = not self.gamecells[cellnumber]['hasbomb']
+                cellvalue = not self.puzzlecells[cellnumber]['hasbomb']
                 if cellvalue:
                     if colpreviousvalue == 1:
                         colcountingones += 1
@@ -259,7 +259,7 @@ class CreateGame(AbstractGui):
             binstr = ''
             for colcounter in range(self.boardsize):
                 cellnumber = rowcounter + (colcounter * self.boardsize)
-                cellvalue = self.gamecells[cellnumber]['hasbomb']
+                cellvalue = self.puzzlecells[cellnumber]['hasbomb']
                 binstr += '0' if cellvalue else '1'
             thenumlist.append(int(binstr,2))
         #print(thenumlist)
